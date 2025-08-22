@@ -16,20 +16,24 @@ const minFraudClient = new MinFraudClient(process.env.MAXMIND_ACCOUNT_ID, proces
 // ✅ GeoIP endpoint
 app.get('/geoip', async (req, res) => {
   try {
-    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-    const response = await geoClient.city(ip);
+    const forwarded = req.headers['x-forwarded-for'];
+    const ip = forwarded ? forwarded.split(',')[0].trim() : req.ip;
 
+    console.log("Client IP:", ip);
+
+    const response = await geoClient.city(ip);
     res.json({
-      ip,
+      ip: ip,
       country: response.country.isoCode,
       city: response.city.names.en,
-      region: response.subdivisions[0]?.names.en
+      traits: response.traits
     });
   } catch (error) {
-    console.error('GeoIP error:', error);
+    console.error("GeoIP error:", error);
     res.status(500).json({ error: error.message });
   }
 });
+
 
 // ✅ minFraud Score endpoint
 app.post('/minfraud/score', async (req, res) => {
@@ -71,7 +75,7 @@ app.post('/webhooks/orders/create', async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ order, ip })
-    });
+    });a
 
     const fraudData = await fraudCheck.json();
 
