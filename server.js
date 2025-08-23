@@ -74,13 +74,13 @@ const cleanObject = (obj) => {
 app.post('/minfraud/score', async (req, res) => {
   try {
 
-    let payload = req.body;
+    let payload1 = req.body;
 
-    // Clean the payload before sending to MaxMind
-    const cleanedPayload = cleanObject(payload);
+    // Clean the payload1 before sending to MaxMind
+    const cleanedPayload1 = cleanObject(payload1);
 
     // Send to MaxMind
-    const resp = await minFraudClient.score(cleanedPayload);
+    const resp = await minFraudClient.score(cleanedPayload1);
 
     res.json(resp);
 
