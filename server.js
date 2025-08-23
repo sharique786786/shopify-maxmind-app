@@ -51,9 +51,40 @@ app.get('/geoip', async (req, res) => {
   }
 });
 
+// Remove undefined and empty objects recursively
+const cleanObject = (obj) => {
+  if (obj && typeof obj === 'object') {
+    Object.keys(obj).forEach(key => {
+      if (obj[key] && typeof obj[key] === 'object') {
+        cleanObject(obj[key]);
+      }
+      if (
+        obj[key] === undefined ||
+        obj[key] === null ||
+        (typeof obj[key] === 'object' && Object.keys(obj[key]).length === 0)
+      ) {
+        delete obj[key];
+      }
+    });
+  }
+  return obj;
+};
+
 // ---------- minFRAUD SCORE (direct API) ----------
 app.post('/minfraud/score', async (req, res) => {
   try {
+
+    let payload = req.body;
+
+    // Clean the payload before sending to MaxMind
+    const cleanedPayload = cleanObject(payload);
+
+    // Send to MaxMind
+    const resp = await minFraudClient.score(cleanedPayload);
+
+    res.json(resp);
+
+    
     const { order = {}, ip: ipFromBody } = req.body;
 
     const ip = ipFromBody || order?.client_details?.browser_ip || req.body?.ip || undefined;
