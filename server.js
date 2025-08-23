@@ -1,34 +1,12 @@
 import express from 'express';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
-import cors from 'cors';
-import fetch from 'node-fetch';
 import { WebServiceClient } from '@maxmind/geoip2-node';
 import { Client as MinFraudClient } from '@maxmind/minfraud-api-node';
 
 dotenv.config();
 
 const app = express();
-
-// ✅ Enable CORS for Shopify storefront
-const allowedOrigins = [
-  'https://cultiver.com.au',  // Main store
-  'https://cultiver.us',      // Optional US store
-  'https://your-preview.myshopify.com' // Preview URL if needed
-];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS not allowed for this origin'));
-    }
-  }
-}));
-
-// ✅ For preflight OPTIONS requests
-app.options('*', cors());
 
 // Behind proxies (Render/Cloudflare) so req.ip works correctly
 app.set('trust proxy', true);
@@ -77,8 +55,10 @@ app.get('/geoip', async (req, res) => {
 app.post('/minfraud/score', async (req, res) => {
   try {
     const { order = {}, ip: ipFromBody } = req.body;
+
     const ip = ipFromBody || order?.client_details?.browser_ip || req.body?.ip || undefined;
 
+    // Build minFraud payload (use what Shopify provides; omit fields you don't have)
     const payload = {
       device: ip ? { ip_address: ip } : undefined,
       email: order.email ? { address: order.email } : undefined,
@@ -118,9 +98,12 @@ app.post('/minfraud/score', async (req, res) => {
             currency: order.currency
           }
         : undefined
+      // credit_card: {} // Not available from Shopify webhooks; safe to omit
     };
 
     const resp = await minFraudClient.score(payload);
+
+    // Library versions differ in casing; cover both:
     const riskScore = resp?.riskScore ?? resp?.risk_score ?? null;
     const disposition = resp?.disposition ?? null;
 
@@ -147,6 +130,7 @@ function verifyShopifyWebhook(req, res, next) {
       crypto.timingSafeEqual(Buffer.from(digest, 'utf8'), Buffer.from(hmac, 'utf8'));
 
     if (!safeEqual) return res.status(401).send('Invalid HMAC');
+    // parse after verification
     req.parsedBody = JSON.parse(rawBody.toString('utf8'));
     next();
   } catch (e) {
@@ -160,6 +144,7 @@ app.post('/webhooks/orders/create', verifyShopifyWebhook, async (req, res) => {
   const order = req.parsedBody;
 
   try {
+    // Call minFraud directly (faster than HTTP to self)
     const ip =
       order?.client_details?.browser_ip ||
       order?.customer?.default_address?.ip_address ||
@@ -209,6 +194,7 @@ app.post('/webhooks/orders/create', verifyShopifyWebhook, async (req, res) => {
     const resp = await minFraudClient.score(payload);
     const riskScore = resp?.riskScore ?? resp?.risk_score ?? 0;
 
+    // Tag + (optional) save metafield
     if (riskScore >= Number(process.env.RISK_THRESHOLD || 20)) {
       await fetch(
         `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-04/orders/${order.id}.json`,
@@ -225,6 +211,7 @@ app.post('/webhooks/orders/create', verifyShopifyWebhook, async (req, res) => {
       );
     }
 
+    // Save risk score to an order metafield (optional, handy for analytics)
     if (process.env.SAVE_METAFIELD === 'true') {
       await fetch(
         `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2024-04/orders/${order.id}/metafields.json`,
@@ -249,6 +236,7 @@ app.post('/webhooks/orders/create', verifyShopifyWebhook, async (req, res) => {
     res.sendStatus(200);
   } catch (err) {
     console.error('Fraud webhook error:', err);
+    // Always 200 to avoid webhook retries if you prefer; or 500 to retry:
     res.sendStatus(200);
   }
 });
