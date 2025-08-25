@@ -53,10 +53,16 @@ app.get('/geoip', async (req, res) => {
 
 // ---------- minFRAUD SCORE (direct API) ----------
 app.post('/minfraud/score', async (req, res) => {
-  const transactionData = req.body; // Customer, billing, shipping info
-  const response = await client.insights(transactionData);
-  res.json(response);
+  try {
+    const transactionData = req.body; // JSON from Postman
+    const response = await minFraudClient.score(transactionData); // FIXED
+    res.json(response);
+  } catch (err) {
+    console.error('minFraud error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
+
 
 // ---------- Shopify HMAC verification ----------
 function verifyShopifyWebhook(req, res, next) {
