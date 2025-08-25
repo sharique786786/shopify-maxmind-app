@@ -53,65 +53,9 @@ app.get('/geoip', async (req, res) => {
 
 // ---------- minFRAUD SCORE (direct API) ----------
 app.post('/minfraud/score', async (req, res) => {
-  try {
-    const { order = {}, ip: ipFromBody } = req.body;
-
-    const ip = ipFromBody || order?.client_details?.browser_ip || req.body?.ip || undefined;
-
-    // Build minFraud payload (use what Shopify provides; omit fields you don't have)
-    const payload = {
-      device: ip ? { ip_address: ip } : undefined,
-      email: order.email ? { address: order.email } : undefined,
-      billing: order.billing_address
-        ? {
-            first_name: order.billing_address.first_name,
-            last_name: order.billing_address.last_name,
-            address: {
-              line_1: order.billing_address.address1,
-              line_2: order.billing_address.address2,
-              city: order.billing_address.city,
-              region: order.billing_address.province_code || order.billing_address.province,
-              postal: order.billing_address.zip,
-              country: order.billing_address.country_code
-            },
-            phone_number: order.billing_address.phone
-          }
-        : undefined,
-      shipping: order.shipping_address
-        ? {
-            first_name: order.shipping_address.first_name,
-            last_name: order.shipping_address.last_name,
-            address: {
-              line_1: order.shipping_address.address1,
-              line_2: order.shipping_address.address2,
-              city: order.shipping_address.city,
-              region: order.shipping_address.province_code || order.shipping_address.province,
-              postal: order.shipping_address.zip,
-              country: order.shipping_address.country_code
-            },
-            phone_number: order.shipping_address.phone
-          }
-        : undefined,
-      order: (order.total_price && order.currency)
-        ? {
-            amount: Number(order.total_price),
-            currency: order.currency
-          }
-        : undefined
-      // credit_card: {} // Not available from Shopify webhooks; safe to omit
-    };
-
-    const resp = await minFraudClient.score(payload);
-
-    // Library versions differ in casing; cover both:
-    const riskScore = resp?.riskScore ?? resp?.risk_score ?? null;
-    const disposition = resp?.disposition ?? null;
-
-    res.json({ riskScore, disposition });
-  } catch (err) {
-    console.error('minFraud error:', err);
-    res.status(500).json({ error: err.message });
-  }
+  const transactionData = req.body; // Customer, billing, shipping info
+  const response = await client.insights(transactionData);
+  res.json(response);
 });
 
 // ---------- Shopify HMAC verification ----------
