@@ -71,7 +71,7 @@ app.post('/minfraud/score', async (req, res) => {
               line_2: order.billing_address.address2,
               city: order.billing_address.city,
               region: order.billing_address.province_code || order.billing_address.province,
-              postal: order.billing_address.zip,
+              postal: order.billing_address.zip, 
               country: order.billing_address.country_code
             },
             phone_number: order.billing_address.phone
