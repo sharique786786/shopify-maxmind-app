@@ -2,7 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { WebServiceClient } from '@maxmind/geoip2-node';
-import { Client as MinFraudClient } from '@maxmind/minfraud-api';
+import { Client as MinFraudClient } from '@maxmind/minfraud-api-node';
 
 dotenv.config();
 
