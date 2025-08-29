@@ -2,7 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { WebServiceClient } from '@maxmind/geoip2-node';
-import { Client as MinFraudClient } from '@maxmind/minfraud-api-node';
+// import { Client as MinFraudClient } from '@maxmind/minfraud-api-node';
 
 dotenv.config();
 
@@ -22,10 +22,19 @@ const geoClient = new WebServiceClient(
   process.env.MAXMIND_ACCOUNT_ID,
   process.env.MAXMIND_LICENSE_KEY
 );
-const minFraudClient = new MinFraudClient(
-  process.env.MAXMIND_ACCOUNT_ID,
-  process.env.MAXMIND_LICENSE_KEY
-);
+// const minFraudClient = new MinFraudClient(
+//   process.env.MAXMIND_ACCOUNT_ID,
+//   process.env.MAXMIND_LICENSE_KEY
+// );
+
+const maxmind = require('@maxmind/minfraud-api');
+// Use environment variables for safety
+const minFraudClient = new maxmind.Client({
+  accountId: process.env.MAXMIND_ACCOUNT_ID || '138090',
+  licenseKey: process.env.MAXMIND_LICENSE_KEY,
+  timeout: 3000 // optional
+});
+
 
 // Small helper: first public IP from XFF list
 const getClientIp = (req) => {
@@ -52,33 +61,80 @@ app.get('/geoip', async (req, res) => {
 });
 
 // ---------- minFRAUD SCORE (direct API) ----------
+// Utility: recursively remove null, undefined, or empty objects
+const cleanObject = (obj) => {
+  if (obj && typeof obj === 'object') {
+    Object.keys(obj).forEach(key => {
+      if (obj[key] && typeof obj[key] === 'object') {
+        cleanObject(obj[key]);
+      }
+      if (
+        obj[key] === undefined ||
+        obj[key] === null ||
+        (typeof obj[key] === 'object' && Object.keys(obj[key]).length === 0)
+      ) {
+        delete obj[key];
+      }
+    });
+  }
+  return obj;
+};
+
 app.post('/minfraud/score', async (req, res) => {
   try {
-    const { ip, order } = req.body;
+    const { order = {}, ip: ipFromBody } = req.body;
 
-    const transactionData = {
-      device: {
-        ip_address: ip
-      },
-      email: order?.email ? { address: order.email } : undefined,
-      billing: order?.billing_address
-        ? {
-            first_name: order.billing_address.first_name,
-            last_name: order.billing_address.last_name,
-            address_1: order.billing_address.address1,
-            city: order.billing_address.city,
-            postal: order.billing_address.zip,
-            country: order.billing_address.country_code
-          }
-        : undefined
+    const ip = ipFromBody || order?.client_details?.browser_ip;
+
+    let payload = {
+      device: ip ? { ip_address: ip } : undefined,
+      email: order.email ? { address: order.email } : undefined,
+      billing: order.billing_address ? {
+        first_name: order.billing_address.first_name,
+        last_name: order.billing_address.last_name,
+        address: {
+          line_1: order.billing_address.address1,
+          line_2: order.billing_address.address2,
+          city: order.billing_address.city,
+          region: order.billing_address.province_code || order.billing_address.province,
+          postal: order.billing_address.zip,
+          country: order.billing_address.country_code
+        },
+        phone_number: order.billing_address.phone
+      } : undefined,
+      shipping: order.shipping_address ? {
+        first_name: order.shipping_address.first_name,
+        last_name: order.shipping_address.last_name,
+        address: {
+          line_1: order.shipping_address.address1,
+          line_2: order.shipping_address.address2,
+          city: order.shipping_address.city,
+          region: order.shipping_address.province_code || order.shipping_address.province,
+          postal: order.shipping_address.zip,
+          country: order.shipping_address.country_code
+        },
+        phone_number: order.shipping_address.phone
+      } : undefined,
+      order: (order.total_price && order.currency) ? {
+        amount: Number(order.total_price),
+        currency: order.currency
+      } : undefined
     };
 
-    console.log("Sending to MaxMind:", JSON.stringify(transactionData, null, 2));
+    // Clean payload before sending
+    payload = cleanObject(payload);
 
-    const response = await minFraudClient.score(transactionData);
-    res.json(response);
+    console.log("Sending payload to MaxMind:", JSON.stringify(payload, null, 2));
+
+    const resp = await minFraudClient.score(payload);
+
+    // Risk score and disposition
+    const riskScore = resp?.riskScore ?? resp?.risk_score ?? null;
+    const disposition = resp?.disposition ?? null;
+
+    res.json({ riskScore, disposition, raw: resp });
   } catch (err) {
-    console.error("minFraud error:", err);
+    console.error('minFraud error:', err);
     res.status(500).json({ error: err.message });
   }
 });
