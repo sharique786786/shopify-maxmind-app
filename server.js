@@ -2,7 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { WebServiceClient } from '@maxmind/geoip2-node';
-// import { Client as MinFraudClient } from '@maxmind/minfraud-api-node';
+import { Client as MinFraudClient } from '@maxmind/minfraud-api';
 
 dotenv.config();
 
@@ -22,19 +22,10 @@ const geoClient = new WebServiceClient(
   process.env.MAXMIND_ACCOUNT_ID,
   process.env.MAXMIND_LICENSE_KEY
 );
-// const minFraudClient = new MinFraudClient(
-//   process.env.MAXMIND_ACCOUNT_ID,
-//   process.env.MAXMIND_LICENSE_KEY
-// );
-
-const maxmind = require('@maxmind/minfraud-api');
-// Use environment variables for safety
-const minFraudClient = new maxmind.Client({
-  accountId: process.env.MAXMIND_ACCOUNT_ID || '138090',
-  licenseKey: process.env.MAXMIND_LICENSE_KEY,
-  timeout: 3000 // optional
-});
-
+const minFraudClient = new MinFraudClient(
+  process.env.MAXMIND_ACCOUNT_ID,
+  process.env.MAXMIND_LICENSE_KEY
+);
 
 // Small helper: first public IP from XFF list
 const getClientIp = (req) => {
