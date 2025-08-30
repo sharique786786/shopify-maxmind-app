@@ -12,7 +12,7 @@ async function run() {
 
     const transactionData = {
       device: {
-        ip_address: "27.62.209.42"
+        ip_address: "106.194.130.207"
       },
       email: {
         address: "john@example.com"
