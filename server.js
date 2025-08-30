@@ -164,10 +164,7 @@ function verifyShopifyWebhook(req, res, next) {
 }
 
 // ---------- Orders Create Webhook ----------
-app.post(
-  '/webhooks/orders/create',
-  verifyShopifyWebhook,
-  async (req, res) => {
+app.post('/webhooks/orders/create', verifyShopifyWebhook, async (req, res) => {
     const order = req.parsedBody;
 
     try {
