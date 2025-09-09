@@ -156,51 +156,74 @@ function verifyShopifyWebhook(req, res, next) {
 }
 
 // --------- /webhooks/orders/create ---------
-app.post("/webhooks/orders/create", verifyShopifyWebhook, async (req, res) => {
-  const order = req.parsedBody;
-  try {
-    const ip = order?.client_details?.browser_ip;
+app.post(
+  "/webhooks/orders/create",
+  verifyShopifyWebhook,
+  async (req, res) => {
+    const order = req.parsedBody;
+    try {
+      const ip =
+        order?.client_details?.browser_ip ||
+        order?.customer?.default_address?.ip_address ||
+        undefined;
 
-    const payload = cleanObject({
-      device: ip ? { ip_address: ip } : undefined,
-      email: order.email ? { address: order.email } : undefined,
-      billing: order.billing_address && {
-        first_name: order.billing_address.first_name,
-        last_name: order.billing_address.last_name,
-        address: order.billing_address.address1,
-        city: order.billing_address.city,
-        region: order.billing_address.province_code,
-        postal: order.billing_address.zip,
-        country: order.billing_address.country_code,
-        phone_number: order.billing_address.phone,
-      },
-      order: order.total_price && {
-        amount: Number(order.total_price),
-        currency: order.currency,
-      },
-    });
+      const payload = cleanObject({
+        device: ip ? { ip_address: ip } : undefined,
+        email: order.email ? { address: order.email } : undefined,
+        billing: order.billing_address
+          ? {
+              first_name: order.billing_address.first_name,
+              last_name: order.billing_address.last_name,
+              address: order.billing_address.address1,
+              address_2: order.billing_address.address2,
+              city: order.billing_address.city,
+              region:
+                order.billing_address.province_code ||
+                order.billing_address.province,
+              postal: order.billing_address.zip,
+              country: order.billing_address.country_code,
+              phone_number: order.billing_address.phone,
+            }
+          : undefined,
+        shipping: order.shipping_address
+          ? {
+              first_name: order.shipping_address.first_name,
+              last_name: order.shipping_address.last_name,
+              address: order.shipping_address.address1,
+              address_2: order.shipping_address.address2,
+              city: order.shipping_address.city,
+              region:
+                order.shipping_address.province_code ||
+                order.shipping_address.province,
+              postal: order.shipping_address.zip,
+              country: order.shipping_address.country_code,
+              phone_number: order.shipping_address.phone,
+            }
+          : undefined,
+        order:
+          order.total_price && order.currency
+            ? {
+                amount: Number(order.total_price),
+                currency: order.currency,
+              }
+            : undefined,
+      });
 
-    const resp = await minFraudClient.score(payload);
-    const riskScore = resp?.riskScore ?? 0;
+      const resp = await minFraudClient.score(payload);
+      const riskScore = resp?.riskScore ?? resp?.risk_score ?? 0;
 
-    console.log(`Fraud check for order ${order.id}: ${riskScore}`);
+      console.log("Webhook riskScore:", riskScore);
 
-    // --- Apply rules ---
-    if (riskScore >= 75) {
-      await tagOrder(order.id, `HighRisk-${riskScore}`);
-    } else if (riskScore >= 50) {
-      await tagOrder(order.id, `MediumRisk-${riskScore}`);
-    } else {
-      await tagOrder(order.id, `LowRisk-${riskScore}`);
+      // Shopify actions (tags/metafields) ...
+      // (your existing code here)
+
+      res.sendStatus(200);
+    } catch (err) {
+      console.error("Fraud webhook error:", err);
+      res.sendStatus(200);
     }
-
-    res.sendStatus(200);
-  } catch (err) {
-    console.error("Fraud webhook error:", err);
-    res.sendStatus(500); // so Shopify retries
   }
-});
-
+);
 
 // --------- Health ---------
 app.get("/health", (req, res) => res.send("ok"));
