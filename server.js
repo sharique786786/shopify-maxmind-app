@@ -119,7 +119,7 @@ app.post("/minfraud/score", async (req, res) => {
       : undefined,
 });
 
-
+    console.log("Incoming body:", JSON.stringify(req.body, null, 2));
     console.log("Sending payload to MaxMind:", JSON.stringify(payload, null, 2));
 
     const resp = await minFraudClient.score(payload);
@@ -217,7 +217,7 @@ app.post(
         }
       : undefined,
 });
-
+      console.log("Incoming body:", JSON.stringify(req.body, null, 2));
 
       const resp = await minFraudClient.score(payload);
       const riskScore = resp?.riskScore ?? resp?.risk_score ?? 0;
