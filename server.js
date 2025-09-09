@@ -5,6 +5,7 @@ import { WebServiceClient } from "@maxmind/geoip2-node";
 import { Client as MinFraudClient } from "@maxmind/minfraud-api-node";
 
 dotenv.config();
+
 const app = express();
 
 // Trust proxies (Render, Cloudflare, etc.)
