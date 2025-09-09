@@ -74,52 +74,47 @@ app.post("/minfraud/score", async (req, res) => {
     const ip = ipFromBody || order?.client_details?.browser_ip;
 
     let payload = cleanObject({
-  device: ip ? { ip_address: ip } : undefined,
-  email: order.email ? { address: order.email } : undefined,
-  billing: order.billing_address
-    ? {
-        first_name: order.billing_address.first_name,
-        last_name: order.billing_address.last_name,
-        address: {
-          line_1: order.billing_address.address1,
-          line_2: order.billing_address.address2,
-          city: order.billing_address.city,
-          region:
-            order.billing_address.province_code ||
-            order.billing_address.province,
-          postal: order.billing_address.zip,
-          country: order.billing_address.country_code,
-        },
-        phone_number: order.billing_address.phone,
-      }
-    : undefined,
-  shipping: order.shipping_address
-    ? {
-        first_name: order.shipping_address.first_name,
-        last_name: order.shipping_address.last_name,
-        address: {
-          line_1: order.shipping_address.address1,
-          line_2: order.shipping_address.address2,
-          city: order.shipping_address.city,
-          region:
-            order.shipping_address.province_code ||
-            order.shipping_address.province,
-          postal: order.shipping_address.zip,
-          country: order.shipping_address.country_code,
-        },
-        phone_number: order.shipping_address.phone,
-      }
-    : undefined,
-  order:
-    order.total_price && order.currency
-      ? {
-          amount: Number(order.total_price),
-          currency: order.currency,
-        }
-      : undefined,
-});
+      device: ip ? { ip_address: ip } : undefined,
+      email: order.email ? { address: order.email } : undefined,
+      billing: order.billing_address
+        ? {
+            first_name: order.billing_address.first_name,
+            last_name: order.billing_address.last_name,
+            address: order.billing_address.address1,
+            address_2: order.billing_address.address2,
+            city: order.billing_address.city,
+            region:
+              order.billing_address.province_code ||
+              order.billing_address.province,
+            postal: order.billing_address.zip,
+            country: order.billing_address.country_code,
+            phone_number: order.billing_address.phone,
+          }
+        : undefined,
+      shipping: order.shipping_address
+        ? {
+            first_name: order.shipping_address.first_name,
+            last_name: order.shipping_address.last_name,
+            address: order.shipping_address.address1,
+            address_2: order.shipping_address.address2,
+            city: order.shipping_address.city,
+            region:
+              order.shipping_address.province_code ||
+              order.shipping_address.province,
+            postal: order.shipping_address.zip,
+            country: order.shipping_address.country_code,
+            phone_number: order.shipping_address.phone,
+          }
+        : undefined,
+      order:
+        order.total_price && order.currency
+          ? {
+              amount: Number(order.total_price),
+              currency: order.currency,
+            }
+          : undefined,
+    });
 
-    console.log("Incoming body:", JSON.stringify(req.body, null, 2));
     console.log("Sending payload to MaxMind:", JSON.stringify(payload, null, 2));
 
     const resp = await minFraudClient.score(payload);
@@ -172,52 +167,47 @@ app.post(
         order?.customer?.default_address?.ip_address ||
         undefined;
 
-      let payload = cleanObject({
-  device: ip ? { ip_address: ip } : undefined,
-  email: order.email ? { address: order.email } : undefined,
-  billing: order.billing_address
-    ? {
-        first_name: order.billing_address.first_name,
-        last_name: order.billing_address.last_name,
-        address: {
-          line_1: order.billing_address.address1,
-          line_2: order.billing_address.address2,
-          city: order.billing_address.city,
-          region:
-            order.billing_address.province_code ||
-            order.billing_address.province,
-          postal: order.billing_address.zip,
-          country: order.billing_address.country_code,
-        },
-        phone_number: order.billing_address.phone,
-      }
-    : undefined,
-  shipping: order.shipping_address
-    ? {
-        first_name: order.shipping_address.first_name,
-        last_name: order.shipping_address.last_name,
-        address: {
-          line_1: order.shipping_address.address1,
-          line_2: order.shipping_address.address2,
-          city: order.shipping_address.city,
-          region:
-            order.shipping_address.province_code ||
-            order.shipping_address.province,
-          postal: order.shipping_address.zip,
-          country: order.shipping_address.country_code,
-        },
-        phone_number: order.shipping_address.phone,
-      }
-    : undefined,
-  order:
-    order.total_price && order.currency
-      ? {
-          amount: Number(order.total_price),
-          currency: order.currency,
-        }
-      : undefined,
-});
-      console.log("Incoming body:", JSON.stringify(req.body, null, 2));
+      const payload = cleanObject({
+        device: ip ? { ip_address: ip } : undefined,
+        email: order.email ? { address: order.email } : undefined,
+        billing: order.billing_address
+          ? {
+              first_name: order.billing_address.first_name,
+              last_name: order.billing_address.last_name,
+              address: order.billing_address.address1,
+              address_2: order.billing_address.address2,
+              city: order.billing_address.city,
+              region:
+                order.billing_address.province_code ||
+                order.billing_address.province,
+              postal: order.billing_address.zip,
+              country: order.billing_address.country_code,
+              phone_number: order.billing_address.phone,
+            }
+          : undefined,
+        shipping: order.shipping_address
+          ? {
+              first_name: order.shipping_address.first_name,
+              last_name: order.shipping_address.last_name,
+              address: order.shipping_address.address1,
+              address_2: order.shipping_address.address2,
+              city: order.shipping_address.city,
+              region:
+                order.shipping_address.province_code ||
+                order.shipping_address.province,
+              postal: order.shipping_address.zip,
+              country: order.shipping_address.country_code,
+              phone_number: order.shipping_address.phone,
+            }
+          : undefined,
+        order:
+          order.total_price && order.currency
+            ? {
+                amount: Number(order.total_price),
+                currency: order.currency,
+              }
+            : undefined,
+      });
 
       const resp = await minFraudClient.score(payload);
       const riskScore = resp?.riskScore ?? resp?.risk_score ?? 0;
