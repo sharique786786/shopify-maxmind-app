@@ -4,7 +4,6 @@ import dotenv from "dotenv";
 import { WebServiceClient } from "@maxmind/geoip2-node";
 import { Client as MinFraudClient } from "@maxmind/minfraud-api-node";
 import * as minFraud from "@maxmind/minfraud-api-node";
-import axios from "axios";
 
 dotenv.config();
 
@@ -161,7 +160,7 @@ function verifyShopifyWebhook(req, res, next) {
 }
 
 // --------- /webhooks/orders/create ---------
-
+// --------- /webhooks/orders/create ---------
 app.post(
   "/webhooks/orders/create",
   verifyShopifyWebhook,
@@ -174,7 +173,7 @@ app.post(
         order?.customer?.default_address?.ip_address ||
         undefined;
 
-      const payload = {
+      const payload = cleanObject({
         device: ip ? { ip_address: ip } : undefined,
         email: order.email ? { address: order.email } : undefined,
         billing: order.billing_address
@@ -182,9 +181,14 @@ app.post(
               first_name: order.billing_address.first_name,
               last_name: order.billing_address.last_name,
               address: order.billing_address.address1,
+              address_2: order.billing_address.address2,
               city: order.billing_address.city,
+              region:
+                order.billing_address.province_code ||
+                order.billing_address.province,
               postal: order.billing_address.zip,
               country: order.billing_address.country_code,
+              phone_number: order.billing_address.phone,
             }
           : undefined,
         shipping: order.shipping_address
@@ -192,9 +196,14 @@ app.post(
               first_name: order.shipping_address.first_name,
               last_name: order.shipping_address.last_name,
               address: order.shipping_address.address1,
+              address_2: order.shipping_address.address2,
               city: order.shipping_address.city,
+              region:
+                order.shipping_address.province_code ||
+                order.shipping_address.province,
               postal: order.shipping_address.zip,
               country: order.shipping_address.country_code,
+              phone_number: order.shipping_address.phone,
             }
           : undefined,
         order:
@@ -204,38 +213,47 @@ app.post(
                 currency: order.currency,
               }
             : undefined,
-      };
+      });
 
       const resp = await minFraudClient.score(payload);
-      const riskScore = resp?.riskScore ?? 0;
+      const riskScore = resp?.riskScore ?? resp?.risk_score ?? 0;
 
       console.log("Webhook riskScore:", riskScore);
 
-      // --- Decide tag based on thresholds ---
-      let tag = "fraud-low-risk";
-      if (riskScore >= 70) tag = "fraud-high-risk";
-      else if (riskScore >= 30) tag = "fraud-medium-risk";
+      // ---- Shopify tagging via Admin API ----
+      const tag =
+        riskScore >= 75 ? "High Risk" :
+        riskScore >= 50 ? "Medium Risk" :
+        "Low Risk";
 
-      // --- Apply tag to order in Shopify ---
-      await axios({
-        method: "PUT",
-        url: `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2023-10/orders/${order.id}.json`,
-        headers: {
-          "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-          "Content-Type": "application/json",
-        },
-        data: {
-          order: {
-            id: order.id,
-            tags: `${order.tags}, ${tag}`.trim(),
+      const shopifyResp = await fetch(
+        `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2023-10/orders/${order.id}.json`,
+        {
+          method: "PUT",
+          headers: {
+            "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
+            "Content-Type": "application/json",
           },
-        },
-      });
+          body: JSON.stringify({
+            order: {
+              id: order.id,
+              tags: `${order.tags || ""}, ${tag}`.trim(),
+            },
+          }),
+        }
+      );
+
+      if (!shopifyResp.ok) {
+        const text = await shopifyResp.text();
+        console.error("Shopify update failed:", text);
+      } else {
+        console.log("Shopify order tagged:", tag);
+      }
 
       res.sendStatus(200);
     } catch (err) {
       console.error("Fraud webhook error:", err);
-      res.sendStatus(200); // always 200 so Shopify doesn’t retry
+      res.sendStatus(200);
     }
   }
 );
