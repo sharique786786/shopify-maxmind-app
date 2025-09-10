@@ -69,7 +69,6 @@ const cleanObject = (obj) => {
 };
 
 // --------- /minfraud/score (test in Postman) ---------
-// --------- /minfraud/score (test in Postman) ---------
 app.post("/minfraud/score", async (req, res) => {
   try {
     const { order = {}, ip: ipFromBody } = req.body;
@@ -172,60 +171,64 @@ app.post(
         order?.customer?.default_address?.ip_address ||
         undefined;
 
-      const payload = cleanObject({
-        device: ip ? { ip_address: ip } : undefined,
-        email: order.email ? { address: order.email } : undefined,
+      // Build a Transaction object
+      const transaction = new minFraud.Transaction({
+        device: ip ? new minFraud.Device({ ipAddress: ip }) : undefined,
+        email: order.email ? new minFraud.Email({ address: order.email }) : undefined,
         billing: order.billing_address
-          ? {
-              first_name: order.billing_address.first_name,
-              last_name: order.billing_address.last_name,
+          ? new minFraud.Billing({
+              firstName: order.billing_address.first_name,
+              lastName: order.billing_address.last_name,
               address: order.billing_address.address1,
-              address_2: order.billing_address.address2,
+              address2: order.billing_address.address2,
               city: order.billing_address.city,
               region:
                 order.billing_address.province_code ||
                 order.billing_address.province,
               postal: order.billing_address.zip,
               country: order.billing_address.country_code,
-              phone_number: order.billing_address.phone,
-            }
+              phoneNumber: order.billing_address.phone,
+            })
           : undefined,
         shipping: order.shipping_address
-          ? {
-              first_name: order.shipping_address.first_name,
-              last_name: order.shipping_address.last_name,
+          ? new minFraud.Shipping({
+              firstName: order.shipping_address.first_name,
+              lastName: order.shipping_address.last_name,
               address: order.shipping_address.address1,
-              address_2: order.shipping_address.address2,
+              address2: order.shipping_address.address2,
               city: order.shipping_address.city,
               region:
                 order.shipping_address.province_code ||
                 order.shipping_address.province,
               postal: order.shipping_address.zip,
               country: order.shipping_address.country_code,
-              phone_number: order.shipping_address.phone,
-            }
+              phoneNumber: order.shipping_address.phone,
+            })
           : undefined,
         order:
           order.total_price && order.currency
-            ? {
+            ? new minFraud.Order({
                 amount: Number(order.total_price),
                 currency: order.currency,
-              }
+              })
             : undefined,
       });
 
-      const resp = await minFraudClient.score(payload);
+      console.log("Webhook transaction:", JSON.stringify(transaction, null, 2));
+
+      // Send to MaxMind
+      const resp = await minFraudClient.score(transaction);
       const riskScore = resp?.riskScore ?? resp?.risk_score ?? 0;
 
       console.log("Webhook riskScore:", riskScore);
 
-      // Shopify actions (tags/metafields) ...
-      // (your existing code here)
+      // Shopify actions (add tags, metafields, etc.)
+      // TODO: implement your business logic here
 
       res.sendStatus(200);
     } catch (err) {
       console.error("Fraud webhook error:", err);
-      res.sendStatus(200);
+      res.sendStatus(200); // Always ack Shopify
     }
   }
 );
