@@ -232,3 +232,19 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, () =>
   console.log(`✅ Server running on port ${PORT}`)
 );
+
+// --------- Fraud Check ---------
+app.post('/api/fraud-check', async (req, res) => {
+  try {
+    const fraudRes = await axios.post(
+      `https://minfraud.maxmind.com/minfraud/v2.0/score`,
+      req.body,
+      {
+        auth: { username: MAXMIND_ACCOUNT_ID, password: MAXMIND_LICENSE_KEY }
+      }
+    );
+    res.json(fraudRes.data);
+  } catch (error) {
+    res.status(500).json({ error: 'Fraud Check Failed' });
+  }
+});
