@@ -234,9 +234,9 @@ app.listen(PORT, () =>
 );
 
 // --------- Fraud Check ---------
-app.post('/api/fraud-check', async (req, res) => {
+app.get('/api/fraud-check', async (req, res) => {
   try {
-    const fraudRes = await axios.post(
+    const fraudRes = await axios.get(
       `https://minfraud.maxmind.com/minfraud/v2.0/score`,
       req.body,
       {
