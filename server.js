@@ -137,24 +137,19 @@ app.post("/minfraud/score", async (req, res) => {
 // --------- Shopify webhook HMAC verify ---------
 function verifyShopifyWebhook(req, res, next) {
   try {
-    const hmac = req.get("x-shopify-hmac-sha256"); // from headers
-    const rawBody = req.body; // Buffer (thanks to express.raw)
-
+    const hmac = req.get("x-shopify-hmac-sha256");
+    const rawBody = req.body; // Buffer (express.raw used above)
     const digest = crypto
       .createHmac("sha256", process.env.SHOPIFY_API_SECRET)
-      .update(rawBody)
+      .update(rawBody, "utf8")
       .digest("base64");
 
-    const hmacBuffer = Buffer.from(hmac || "", "base64");
-    const digestBuffer = Buffer.from(digest, "base64");
-
     const safeEqual =
-      hmacBuffer.length === digestBuffer.length &&
-      crypto.timingSafeEqual(digestBuffer, hmacBuffer);
+      hmac &&
+      digest &&
+      crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmac));
 
-    if (!safeEqual) {
-      return res.status(401).send("Invalid HMAC");
-    }
+    if (!safeEqual) return res.status(401).send("Invalid HMAC");
 
     req.parsedBody = JSON.parse(rawBody.toString("utf8"));
     next();
@@ -164,15 +159,12 @@ function verifyShopifyWebhook(req, res, next) {
   }
 }
 
-
 // --------- /webhooks/orders/create ---------
 app.post(
   "/webhooks/orders/create",
   verifyShopifyWebhook,
   async (req, res) => {
     const order = req.parsedBody;
-// app.post("/webhooks/orders/create", async (req, res) => {
-//   const order = req.body;
 
     try {
       const ip =
@@ -185,32 +177,32 @@ app.post(
         email: order.email ? { address: order.email } : undefined,
         billing: order.billing_address
           ? {
-              firstName: order.billing_address.first_name,
-              lastName: order.billing_address.last_name,
+              first_name: order.billing_address.first_name,
+              last_name: order.billing_address.last_name,
               address: order.billing_address.address1,
-              address2: order.billing_address.address2,
+              address_2: order.billing_address.address2,
               city: order.billing_address.city,
               region:
                 order.billing_address.province_code ||
                 order.billing_address.province,
               postal: order.billing_address.zip,
               country: order.billing_address.country_code,
-              phoneNumber: order.billing_address.phone,
+              phone_number: order.billing_address.phone,
             }
           : undefined,
         shipping: order.shipping_address
           ? {
-              firstName: order.shipping_address.first_name,
-              lastName: order.shipping_address.last_name,
+              first_name: order.shipping_address.first_name,
+              last_name: order.shipping_address.last_name,
               address: order.shipping_address.address1,
-              address2: order.shipping_address.address2,
+              address_2: order.shipping_address.address2,
               city: order.shipping_address.city,
               region:
                 order.shipping_address.province_code ||
                 order.shipping_address.province,
               postal: order.shipping_address.zip,
               country: order.shipping_address.country_code,
-              phoneNumber: order.shipping_address.phone,
+              phone_number: order.shipping_address.phone,
             }
           : undefined,
         order:
