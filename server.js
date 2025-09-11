@@ -180,32 +180,32 @@ app.post("/webhooks/orders/create", async (req, res) => {
         email: order.email ? { address: order.email } : undefined,
         billing: order.billing_address
           ? {
-              first_name: order.billing_address.first_name,
-              last_name: order.billing_address.last_name,
+              firstName: order.billing_address.first_name,
+              lastName: order.billing_address.last_name,
               address: order.billing_address.address1,
-              address_2: order.billing_address.address2,
+              address2: order.billing_address.address2,
               city: order.billing_address.city,
               region:
                 order.billing_address.province_code ||
                 order.billing_address.province,
               postal: order.billing_address.zip,
               country: order.billing_address.country_code,
-              phone_number: order.billing_address.phone,
+              phoneNumber: order.billing_address.phone,
             }
           : undefined,
         shipping: order.shipping_address
           ? {
-              first_name: order.shipping_address.first_name,
-              last_name: order.shipping_address.last_name,
+              firstName: order.shipping_address.first_name,
+              lastName: order.shipping_address.last_name,
               address: order.shipping_address.address1,
-              address_2: order.shipping_address.address2,
+              address2: order.shipping_address.address2,
               city: order.shipping_address.city,
               region:
                 order.shipping_address.province_code ||
                 order.shipping_address.province,
               postal: order.shipping_address.zip,
               country: order.shipping_address.country_code,
-              phone_number: order.shipping_address.phone,
+              phoneNumber: order.shipping_address.phone,
             }
           : undefined,
         order:
