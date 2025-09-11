@@ -34,6 +34,49 @@ const getClientIp = (req) => {
 
 // --------- GEOIP ---------
 app.get("/geoip", async (req, res) => {
+
+const crypto = require('crypto');
+const secretKey = '6d945c0ef5e70a6f48f1c0c6ef21f7fd'; //
+function generateShopifyHmac(data, secretKey) {
+  const hmac = crypto.createHmac('sha256', secretKey);
+  hmac.update(data, 'utf8');
+  return hmac.digest('base64');
+}
+
+// Example usage:
+const shopifyApiSecretKey = '6d945c0ef5e70a6f48f1c0c6ef21f7fd'; // Replace with your actual secret key
+const rawRequestBody = '{
+  "id": 1234567890,
+  "email": "john@example.com",
+  "total_price": "200.00",
+  "currency": "USD",
+  "client_details": {
+    "browser_ip": "106.194.130.193"
+  },
+  "billing_address": {
+    "first_name": "John",
+    "last_name": "Doe",
+    "address1": "123 Main St",
+    "city": "Indore",
+    "zip": "452001",
+    "country_code": "IN"
+  },
+  "shipping_address": {
+    "first_name": "John",
+    "last_name": "Doe",
+    "address1": "123 Main St",
+    "city": "Indore",
+    "zip": "452001",
+    "country_code": "IN"
+  },
+  "tags": ""
+}
+'; // Replace with the actual raw request body
+
+const hmacSignature = generateShopifyHmac(rawRequestBody, shopifyApiSecretKey);
+console.log('Generated HMAC Signature:', hmacSignature);
+
+  
   try {
     const ip = getClientIp(req);
     const r = await geoClient.city(ip);
@@ -159,6 +202,7 @@ function verifyShopifyWebhook(req, res, next) {
   }
 }
 
+// --------- /webhooks/orders/create ---------
 // --------- /webhooks/orders/create ---------
 app.post(
   "/webhooks/orders/create",
