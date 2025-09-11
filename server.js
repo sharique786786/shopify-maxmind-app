@@ -160,7 +160,6 @@ function verifyShopifyWebhook(req, res, next) {
 }
 
 // --------- /webhooks/orders/create ---------
-// --------- /webhooks/orders/create ---------
 app.post(
   "/webhooks/orders/create",
   verifyShopifyWebhook,
