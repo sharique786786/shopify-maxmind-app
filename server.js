@@ -137,19 +137,24 @@ app.post("/minfraud/score", async (req, res) => {
 // --------- Shopify webhook HMAC verify ---------
 function verifyShopifyWebhook(req, res, next) {
   try {
-    const hmac = req.get("x-shopify-hmac-sha256");
-    const rawBody = req.body; // Buffer (express.raw used above)
+    const hmac = req.get("x-shopify-hmac-sha256"); // from headers
+    const rawBody = req.body; // Buffer (thanks to express.raw)
+
     const digest = crypto
       .createHmac("sha256", process.env.SHOPIFY_API_SECRET)
-      .update(rawBody, "utf8")
+      .update(rawBody)
       .digest("base64");
 
-    const safeEqual =
-      hmac &&
-      digest &&
-      crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmac));
+    const hmacBuffer = Buffer.from(hmac || "", "base64");
+    const digestBuffer = Buffer.from(digest, "base64");
 
-    if (!safeEqual) return res.status(401).send("Invalid HMAC");
+    const safeEqual =
+      hmacBuffer.length === digestBuffer.length &&
+      crypto.timingSafeEqual(digestBuffer, hmacBuffer);
+
+    if (!safeEqual) {
+      return res.status(401).send("Invalid HMAC");
+    }
 
     req.parsedBody = JSON.parse(rawBody.toString("utf8"));
     next();
@@ -159,15 +164,15 @@ function verifyShopifyWebhook(req, res, next) {
   }
 }
 
+
 // --------- /webhooks/orders/create ---------
-// --------- /webhooks/orders/create ---------
-// app.post(
-//   "/webhooks/orders/create",
-//   verifyShopifyWebhook,
-//   async (req, res) => {
-//     const order = req.parsedBody;
-app.post("/webhooks/orders/create", async (req, res) => {
-  const order = req.body;
+app.post(
+  "/webhooks/orders/create",
+  verifyShopifyWebhook,
+  async (req, res) => {
+    const order = req.parsedBody;
+// app.post("/webhooks/orders/create", async (req, res) => {
+//   const order = req.body;
 
     try {
       const ip =
