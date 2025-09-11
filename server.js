@@ -160,13 +160,13 @@ function verifyShopifyWebhook(req, res, next) {
 }
 
 // --------- /webhooks/orders/create ---------
-// app.post(
-//   "/webhooks/orders/create",
-//   verifyShopifyWebhook,
-//   async (req, res) => {
-//     const order = req.parsedBody;
-app.post("/webhooks/orders/create", async (req, res) => {
-  const order = req.body; // no HMAC parsing
+app.post(
+  "/webhooks/orders/create",
+  verifyShopifyWebhook,
+  async (req, res) => {
+    const order = req.parsedBody;
+// app.post("/webhooks/orders/create", async (req, res) => {
+//   const order = req.body; // no HMAC parsing
     try {
       const ip =
         order?.client_details?.browser_ip ||
