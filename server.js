@@ -165,73 +165,98 @@ app.post(
   verifyShopifyWebhook,
   async (req, res) => {
     const order = req.parsedBody;
+
     try {
       const ip =
         order?.client_details?.browser_ip ||
         order?.customer?.default_address?.ip_address ||
         undefined;
 
-      // Build a Transaction object
-      const transaction = new minFraud.Transaction({
-        device: ip ? new minFraud.Device({ ipAddress: ip }) : undefined,
-        email: order.email ? new minFraud.Email({ address: order.email }) : undefined,
+      const payload = cleanObject({
+        device: ip ? { ip_address: ip } : undefined,
+        email: order.email ? { address: order.email } : undefined,
         billing: order.billing_address
-          ? new minFraud.Billing({
-              firstName: order.billing_address.first_name,
-              lastName: order.billing_address.last_name,
+          ? {
+              first_name: order.billing_address.first_name,
+              last_name: order.billing_address.last_name,
               address: order.billing_address.address1,
-              address2: order.billing_address.address2,
+              address_2: order.billing_address.address2,
               city: order.billing_address.city,
               region:
                 order.billing_address.province_code ||
                 order.billing_address.province,
               postal: order.billing_address.zip,
               country: order.billing_address.country_code,
-              phoneNumber: order.billing_address.phone,
-            })
+              phone_number: order.billing_address.phone,
+            }
           : undefined,
         shipping: order.shipping_address
-          ? new minFraud.Shipping({
-              firstName: order.shipping_address.first_name,
-              lastName: order.shipping_address.last_name,
+          ? {
+              first_name: order.shipping_address.first_name,
+              last_name: order.shipping_address.last_name,
               address: order.shipping_address.address1,
-              address2: order.shipping_address.address2,
+              address_2: order.shipping_address.address2,
               city: order.shipping_address.city,
               region:
                 order.shipping_address.province_code ||
                 order.shipping_address.province,
               postal: order.shipping_address.zip,
               country: order.shipping_address.country_code,
-              phoneNumber: order.shipping_address.phone,
-            })
+              phone_number: order.shipping_address.phone,
+            }
           : undefined,
         order:
           order.total_price && order.currency
-            ? new minFraud.Order({
+            ? {
                 amount: Number(order.total_price),
                 currency: order.currency,
-              })
+              }
             : undefined,
       });
 
-      console.log("Webhook transaction:", JSON.stringify(transaction, null, 2));
-
-      // Send to MaxMind
-      const resp = await minFraudClient.score(transaction);
+      const resp = await minFraudClient.score(payload);
       const riskScore = resp?.riskScore ?? resp?.risk_score ?? 0;
 
       console.log("Webhook riskScore:", riskScore);
 
-      // Shopify actions (add tags, metafields, etc.)
-      // TODO: implement your business logic here
+      // ---- Shopify tagging via Admin API ----
+      const tag =
+        riskScore >= 75 ? "High Risk" :
+        riskScore >= 50 ? "Medium Risk" :
+        "Low Risk";
+
+      const shopifyResp = await fetch(
+        `https://${process.env.SHOPIFY_STORE_DOMAIN}/admin/api/2023-10/orders/${order.id}.json`,
+        {
+          method: "PUT",
+          headers: {
+            "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            order: {
+              id: order.id,
+              tags: `${order.tags || ""}, ${tag}`.trim(),
+            },
+          }),
+        }
+      );
+
+      if (!shopifyResp.ok) {
+        const text = await shopifyResp.text();
+        console.error("Shopify update failed:", text);
+      } else {
+        console.log("Shopify order tagged:", tag);
+      }
 
       res.sendStatus(200);
     } catch (err) {
       console.error("Fraud webhook error:", err);
-      res.sendStatus(200); // Always ack Shopify
+      res.sendStatus(200);
     }
   }
 );
+
 
 // --------- Health ---------
 app.get("/health", (req, res) => res.send("ok"));
